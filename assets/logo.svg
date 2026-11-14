@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="91 309 1603 236" role="img" aria-label="Conecta+"><style>.lg-n{stroke:var(--logo-navy,#1f3a5f)}.lg-g{stroke:var(--logo-green,#2d8c68)}</style><g class="lg-n" fill="none" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"><path d="M350 435L295 375C270 348 245 345 215 345A82 82 0 0 0 215 509H236"/></g>
+<g class="lg-g" fill="none" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180 312 427)"><path d="M350 435L295 375C270 348 245 345 215 345A82 82 0 0 0 215 509H236"/></g><g class="lg-n" fill="none" stroke-width="38" stroke-linecap="round" stroke-linejoin="round">
+<path d="M692 390A56 56 0 1 0 692 462"/><circle cx="777" cy="426" r="56"/>
+<path d="M877 482V415A45 45 0 0 1 967 415V482"/>
+<path d="M1010 426H1121A56 56 0 1 0 1105 466"/>
+<path d="M1250 390A56 56 0 1 0 1250 462"/>
+<path d="M1293 340V446A36 36 0 0 0 1329 482H1334M1293 374H1332"/>
+<circle cx="1420" cy="426" r="56"/><path d="M1476 372V482"/></g>
+<path class="lg-g" fill="none" stroke-width="50" stroke-linecap="round" d="M1545 424H1659M1601 366V484"/></svg>
