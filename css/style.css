@@ -341,3 +341,28 @@ body:has(#main[data-page="whatsapp"]) .site-footer { display: none; }
   .wa-stage { padding: 0; }
   .wa-stage .chat-card { width: 100%; height: 100dvh; min-height: 0; border-radius: 0; }
 }
+
+/* ---- Revisão UI/UX ---- */
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--navy); font-weight: 700; }
+.btn-ghost:hover { background: var(--navy-50); }
+.btn-link { background: none; border-color: transparent; color: var(--green-700); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.btn-link:hover { background: var(--green-50); }
+.job-salary { margin-top: .25rem; font-size: 1.05rem; }
+.card-foot { border-top: 0; padding-top: 0; justify-content: flex-end; margin-top: .9rem; }
+.fav { width: 44px; height: 44px; margin: -6px -6px 0 auto; }
+.nav .nav-login { color: #fff; }
+.hero p.lead { color: #e6edf7; }
+@media (max-width: 799px) {
+  .hero::after { opacity: .35; }
+  .stats { display: flex; overflow-x: auto; scroll-snap-type: x proximity; gap: .6rem; padding-bottom: .5rem; scrollbar-width: none; }
+  .stats::-webkit-scrollbar { display: none; }
+  .stats .stat { flex: 0 0 140px; scroll-snap-align: start; padding: .75rem; }
+  .stats .stat strong { font-size: 1.3rem; }
+  .section-head { flex-wrap: nowrap; align-items: center; }
+  .section-head h2 { font-size: 1.35rem; }
+  .card-foot .btn { width: 100%; min-height: 44px; }
+}
+.section-head .btn { white-space: nowrap; flex: none; }
+.btn-link { font-weight: 600; }
+/* Início: botão "Tenho interesse" centralizado no card */
+#main[data-page="home"] .card-foot { justify-content: center; }

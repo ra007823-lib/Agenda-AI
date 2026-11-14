@@ -13,7 +13,7 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const money = (n) => "R$ " + n.toLocaleString("pt-BR");
   const salary = (j) => `${money(j.salaryMin)} – ${money(j.salaryMax)}`;
-  const ago = (d) => (d <= 1 ? "Hoje/ontem" : `Há ${d} dias`);
+  const ago = (d) => (d <= 0 ? "Hoje" : d === 1 ? "Ontem" : `Há ${d} dias`);
   const company = (id) => companies.find((c) => c.id === id);
   const job = (id) => jobs.find((j) => j.id === id);
   const locationsList = () => [...new Set(jobs.map((j) => j.location))].sort();
@@ -152,6 +152,7 @@
         <div>
           <h3><a href="#/vaga/${j.id}">${esc(j.title)}</a></h3>
           <div class="muted small">${esc(c.name)}</div>
+          <div class="salary job-salary">${salary(j)}</div>
         </div>
         <button class="fav" type="button" data-fav="${j.id}" aria-pressed="${fav}" aria-label="${fav ? "Remover dos favoritos" : "Salvar vaga"}">${icons.heart}</button>
       </div>
@@ -165,11 +166,7 @@
         <span class="tag">${j.category}</span>
       </div>
       <div class="card-foot">
-        <span class="salary">${salary(j)}</span>
-        <div class="actions">
-          <a class="btn btn-outline btn-sm" href="#/vaga/${j.id}">Ver detalhes</a>
-          <button type="button" class="btn btn-wa btn-sm" data-wa="job:${j.id}">${icons.wa}Tenho interesse</button>
-        </div>
+        <button type="button" class="btn btn-wa btn-sm" data-wa="job:${j.id}">${icons.wa}Tenho interesse</button>
       </div>
     </article>`;
   };
@@ -243,7 +240,7 @@
         <div class="stat"><strong>${jobs.length}</strong><span>Vagas abertas</span></div>
         <div class="stat"><strong>${companies.length}</strong><span>Empresas contratando</span></div>
         <div class="stat"><strong>${categories.length}</strong><span>Áreas profissionais</span></div>
-        <div class="stat"><strong>WhatsApp</strong><span>Contato direto</span></div>
+        <div class="stat"><strong>2 dias</strong><span>Retorno das empresas</span></div>
       </div>
       <section class="section">
         <div class="container">
@@ -342,7 +339,7 @@
         <aside class="card side-card">
           <div><div class="muted small">Faixa salarial</div><div class="salary" style="font-size:1.4rem">${salary(j)}</div></div>
           ${waBtn("job:" + j.id, "Tenho interesse", "btn-block")}
-          <button type="button" class="btn btn-outline btn-block" data-fav="${j.id}" aria-pressed="${favs.has(j.id)}">${icons.heart}<span>${favs.has(j.id) ? "Vaga salva" : "Salvar vaga"}</span></button>
+          <button type="button" class="btn btn-ghost btn-block" data-fav="${j.id}" aria-pressed="${favs.has(j.id)}">${icons.heart}<span>${favs.has(j.id) ? "Vaga salva" : "Salvar vaga"}</span></button>
           <dl class="kv">
             <div><dt>Localização</dt><dd>${esc(j.location)}</dd></div>
             <div><dt>Modalidade</dt><dd>${j.modality}</dd></div>
@@ -355,7 +352,7 @@
             ${j.experience ? `<div><dt>Experiência</dt><dd>${esc(j.experience)}</dd></div>` : ""}
             ${j.deadline ? `<div><dt>Inscrições até</dt><dd>${new Date(j.deadline + "T12:00").toLocaleDateString("pt-BR")}</dd></div>` : ""}
           </dl>
-          <button type="button" class="btn btn-wa btn-block" data-wa="company:${c.id}">${icons.wa}Contato com a empresa</button>
+          <button type="button" class="btn btn-link btn-block" data-wa="company:${c.id}">${icons.wa}Falar com a empresa</button>
         </aside>
       </div>
       ${similar.length ? `<div class="container section" style="padding-top:0"><h2>Vagas relacionadas</h2><div class="grid grid-2">${similar.map(jobCard).join("")}</div></div>` : ""}`;
@@ -1058,17 +1055,25 @@
         if (my !== chat.run) return;
         await defaultInfo(me);
       } else {
-        await botSay("Para começar, informe o seu <strong>CPF</strong> (somente números). Vou verificar se você já tem cadastro.", 900);
+        await botSay("Para começar, <strong>qual é o seu nome completo?</strong>", 800);
         if (my !== chat.run) return;
-        chat.step = "cpf"; setInput(true, "CPF (11 números)");
+        chat.step = "name"; setInput(true, "Seu nome completo");
       }
     } catch (e) { if (e !== "cancel") throw e; }
   };
 
   const onUser = async (text) => {
     text = text.trim();
-    if (!text || chat.busy || chat.step !== "cpf") return;
+    if (!text || chat.busy || !["name", "cpf"].includes(chat.step)) return;
     try {
+      if (chat.step === "name") {
+        addMsg(esc(text), "me");
+        if (text.length < 5 || !/\S+\s+\S+/.test(text)) { await botSay("Pode me informar nome e sobrenome, por favor?", 600); return; }
+        chat.data.name = text; chat.step = ""; setInput(false);
+        await botSay(`Prazer, ${esc(text.split(" ")[0])}! Agora informe o seu <strong>CPF</strong> (somente números). Usamos só para localizar o seu cadastro.`, 900);
+        chat.step = "cpf"; setInput(true, "CPF (11 números)");
+        return;
+      }
       if (!validCpf(text)) { addMsg(esc(text), "me"); await botSay("Esse CPF não parece válido. Digite os 11 números, por favor.", 700); return; }
       chat.data.cpfRaw = text.replace(/\D/g, ""); chat.data.cpf = maskCpf(text);
       addMsg(esc(chat.data.cpf), "me"); chat.step = ""; setInput(false); setQuick([]);
@@ -1126,7 +1131,7 @@
     if (cand) links.push(["perfil", "#/perfil", "Meu perfil"]);
     if (comp) links.push(["company", "#/painel", "Painel"]);
     if (logged) links.push(["contato", "#/contato", "Contato"]); else links.push(["login", "#/entrar", "Entrar"]);
-    nav.innerHTML = links.map(([k, href, label]) => `<a href="${href}" ${k === key ? 'aria-current="page"' : ""}>${label}</a>`).join("")
+    nav.innerHTML = links.map(([k, href, label]) => k === "login" ? `<a class="btn btn-green btn-sm nav-login" href="${href}">${label}</a>` : `<a href="${href}" ${k === key ? 'aria-current="page"' : ""}>${label}</a>`).join("")
       + (logged ? `<button type="button" class="nav-out" data-logout>Sair</button>` : "")
 ;
     $$("[data-auth]").forEach((el) => { el.hidden = !(el.dataset.auth === "candidate" ? cand : logged); });
