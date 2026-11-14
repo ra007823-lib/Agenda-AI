@@ -1,5 +1,6 @@
 /* =========================================================
-   Conecta+ — App (roteamento por hash + componentes)
+   Conecta+ — App (páginas em pages/*.html + componentes)
+   Cada página define seu nome em <main data-page>; o conteúdo é montado aqui.
    Funciona 100% local (file://), sem backend ou APIs.
    ========================================================= */
 (() => {
@@ -22,7 +23,12 @@
   let favs = new Set();
   const loadFavs = () => { const c = getCandidate(); favs = new Set(c ? store.get("conecta-favs-" + c.id, []) : []); };
   const saveFavs = () => { const c = getCandidate(); if (c) store.set("conecta-favs-" + c.id, [...favs]); };
-  let nextRoute = null; // rota pedida antes do login
+  /* rota pedida antes do login: guardada na sessão para sobreviver à troca de página */
+  const nextRoute = {
+    get() { try { return sessionStorage.getItem("conecta-next"); } catch (e) { return null; } },
+    set(v) { try { v ? sessionStorage.setItem("conecta-next", v) : sessionStorage.removeItem("conecta-next"); } catch (e) {} },
+  };
+  const go = (r) => Route.go(r);
 
   /* ---------- Armazenamento local (vagas das empresas, candidatos, sessão) ---------- */
   const store = {
@@ -49,7 +55,7 @@
     loadFavs();
   };
   const candidates = store.get("conecta-candidates", []);
-  if (!candidates.some((c) => c.id === "mariana")) candidates.unshift({ id: "mariana", password: "demo123", phone: "(11) 98888-7777", ...profile });
+  if (!candidates.some((c) => c.id === "mariana")) candidates.unshift({ id: "mariana", password: "demo123", phone: "(11) 98888-7777", cpf: "52998224725", ...profile });
   const saveCandidates = () => store.set("conecta-candidates", candidates);
   const getCandidate = () => { const u = readUser(); return (u && u.type === "candidate" && candidates.find((c) => c.id === u.id)) || null; };
   const getSession = () => { const u = readUser(); return u && u.type === "company" && companies.some((c) => c.id === u.id) ? u.id : null; };
@@ -103,6 +109,12 @@
       if (((s * 10) % 11) % 10 !== +c[t]) return false;
     }
     return true;
+  };
+  /* CPF cadastrado: só o hash SHA-256 é guardado no candidato (a conta demo traz "cpf" em texto) */
+  const cpfKey = (raw) => sha256("cpf:" + raw.replace(/\D/g, ""));
+  const findByCpf = async (raw) => {
+    const d = raw.replace(/\D/g, ""), h = await cpfKey(d);
+    return candidates.find((c) => c.cpfHash === h || c.cpf === d) || null;
   };
   const maskCpf = (raw) => { const d = raw.replace(/\D/g, ""); return `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`; };
   const fmtDate = (iso) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -500,6 +512,7 @@
           <fieldset class="fs"><legend>Seus dados</legend>
             <div class="form-grid">
               <div class="field span2"><label for="kn">Nome completo</label><input class="input" id="kn" name="name" autocomplete="name"><span class="err" data-err="name"></span></div>
+              <div class="field"><label for="kf">CPF</label><input class="input" id="kf" name="cpf" inputmode="numeric" placeholder="000.000.000-00"><span class="err" data-err="cpf"></span></div>
               <div class="field"><label for="kp">WhatsApp</label><input class="input" id="kp" name="phone" inputmode="tel" placeholder="(11) 99999-0000"><span class="err" data-err="phone"></span></div>
               <div class="field"><label for="kc">Cidade / UF</label><input class="input" id="kc" name="city" placeholder="São Paulo, SP"><span class="err" data-err="city"></span></div>
               <div class="field"><label for="kr">Profissão / cargo</label><input class="input" id="kr" name="role" placeholder="Ex.: Auxiliar administrativo"></div>
@@ -650,23 +663,7 @@
       const title = cp ? cp.name : "Recrutador Conecta+", ini = cp ? cp.initials : "C+";
       const back = j ? `#/vaga/${j.id}` : "#/vagas";
       return `
-      <div class="page-head"><div class="container">
-        <div class="crumbs"><a href="#/">Início</a> / Triagem pelo WhatsApp</div>
-        <h1 style="font-size:clamp(1.6rem,4vw,2.3rem)">Triagem pelo WhatsApp</h1>
-        <p>Converse com nosso assistente virtual e demonstre interesse nas vagas.</p>
-      </div></div>
-      <div class="container wa-page">
-        <aside class="card wa-info">
-          <h3>Como funciona</h3>
-          <ol class="steps">
-            <li><strong>Nome completo</strong><span class="muted small">Para a empresa saber quem você é.</span></li>
-            <li><strong>CPF</strong><span class="muted small">Validado e guardado de forma parcial.</span></li>
-            <li><strong>Área de interesse</strong><span class="muted small">Mostramos as vagas disponíveis nela.</span></li>
-            <li><strong>Contato da empresa</strong><span class="muted small">A empresa responde pelo WhatsApp em até 2 dias úteis.</span></li>
-          </ol>
-          ${j ? `<div class="demo-box"><div class="muted small">Você está se candidatando a</div><a href="#/vaga/${j.id}"><strong>${esc(j.title)}</strong></a><div class="muted small">${esc(cp.name)} · ${esc(j.location)}</div></div>` : ""}
-          <div class="info-note">Simulação: nenhuma mensagem real é enviada. CPF de teste: <code>529.982.247-25</code></div>
-        </aside>
+      <div class="wa-stage">
         <section class="chat-card" aria-label="Conversa simulada no WhatsApp">
           <header class="wa-head">
             <a class="wa-icon-btn" href="${back}" aria-label="Voltar"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></a>
@@ -691,22 +688,19 @@
 
   /* ---------- Roteador ---------- */
   const parseHash = () => {
-    const raw = location.hash.replace(/^#\/?/, "");
-    const [path, qs = ""] = raw.split("?");
-    const [name = "", arg] = path.split("/");
-    return { name: name || "home", arg, params: new URLSearchParams(qs) };
+    const name = main.dataset.page || "home", params = new URLSearchParams(location.search);
+    return { name, arg: params.get("id") || undefined, params };
   };
 
-  let lastName = null;
   const render = () => {
     const { name, arg, params } = parseHash();
     chat.run++; // cancela qualquer conversa em andamento ao trocar de página
     const cand = getCandidate(), comp = getSession(), logged = !!(cand || comp);
-    const deny = (msg) => { nextRoute = location.hash; toast(msg); location.hash = "#/entrar"; };
-    if (name === "perfil" && !cand) { if (comp) { location.hash = "#/painel"; return; } return deny("Entre como candidato para ver seu perfil."); }
+    const deny = (msg) => { nextRoute.set(Route.current()); toast(msg); setTimeout(() => go("#/entrar"), 900); };
+    if (name === "perfil" && !cand) { if (comp) { go("#/painel"); return; } return deny("Entre como candidato para ver seu perfil."); }
     if (name === "contato" && !logged) return deny("Entre na sua conta para acessar o contato.");
-    if (["painel", "nova-vaga"].includes(name) && !comp) { if (cand) { location.hash = "#/perfil"; return; } return deny("Entre como empresa para acessar o painel."); }
-    if (["entrar", "cadastro-empresa", "cadastro-candidato"].includes(name) && logged) { location.hash = comp ? "#/painel" : "#/perfil"; return; }
+    if (["painel", "nova-vaga"].includes(name) && !comp) { if (cand) { go("#/perfil"); return; } return deny("Entre como empresa para acessar o painel."); }
+    if (["entrar", "cadastro-empresa", "cadastro-candidato"].includes(name) && logged) { go(comp ? "#/painel" : "#/perfil"); return; }
     if (name === "vagas") {
       // links externos (chips, empresas) aplicam filtros; navegação normal preserva o estado
       if ([...params.keys()].length) {
@@ -714,15 +708,13 @@
         F.q = params.get("q") || ""; F.cat = params.get("cat") || ""; F.loc = params.get("loc") || "";
         F.empresa = params.get("empresa") || "";
         if (params.get("modality")) F.modality = [params.get("modality")];
-        history.replaceState(null, "", "#/vagas");
+        history.replaceState(null, "", location.pathname);
       }
     }
     const fn = pages[name] || pages.notFound;
     main.innerHTML = `<div class="view">${fn(arg, params)}</div>`;
     closeMenu();
     updateNav(name);
-    if (name !== lastName || name === "vaga") { window.scrollTo({ top: 0 }); }
-    lastName = name;
     document.title = (name === "vaga" && job(arg) ? job(arg).title + " | " : "") + "Conecta+ | Vagas de emprego";
     bindPage(name);
   };
@@ -747,7 +739,7 @@
         const p = new URLSearchParams();
         ["q", "cat", "loc"].forEach((k) => d.get(k) && p.set(k, d.get(k)));
         p.set("go", "1");
-        location.hash = "#/vagas?" + p.toString();
+        go("#/vagas?" + p.toString());
       });
     }
     if (name === "vagas") {
@@ -814,19 +806,25 @@
         }
         setUser(type, type === "company" ? acc.company : acc.id, f.elements.remember.checked);
         toast("Bem-vindo(a), " + (type === "company" ? company(acc.company).name : acc.name.split(" ")[0]) + "!");
-        const go = nextRoute || (type === "company" ? "#/painel" : "#/perfil");
-        nextRoute = null; location.hash = go;
+        const dest = nextRoute.get() || (type === "company" ? "#/painel" : "#/perfil");
+        nextRoute.set(null); go(dest);
       });
     }
     if (name === "cadastro-candidato") {
       const f = $("#candForm");
+      const q = new URLSearchParams(location.search), fromChat = q.get("from") === "whatsapp";
+      if (q.get("cpf")) f.elements.cpf.value = maskDigits(q.get("cpf"), "###.###.###-##");
+      if (q.get("nome")) f.elements.name.value = q.get("nome");
+      f.elements.cpf.addEventListener("input", (e) => (e.target.value = maskDigits(e.target.value, "###.###.###-##")));
       f.elements.phone.addEventListener("input", (e) => (e.target.value = maskDigits(e.target.value, "(##) #####-####")));
       f.addEventListener("submit", async (e) => {
         e.preventDefault();
         const v = (k) => f.elements[k].value.trim();
         const email = v("email").toLowerCase(), pass = f.elements.password.value;
+        const cpfHash = validCpf(v("cpf")) ? await cpfKey(v("cpf")) : null;
         const ok = applyRules(f, {
           name: v("name").split(/\s+/).filter(Boolean).length < 2 && "Informe nome e sobrenome.",
+          cpf: (!cpfHash && "Informe um CPF válido.") || (candidates.some((x) => x.cpfHash === cpfHash) && "Este CPF já possui cadastro. Use a opção Entrar."),
           phone: v("phone").replace(/\D/g, "").length < 10 && "Informe um WhatsApp com DDD.",
           city: v("city").length < 3 && "Informe cidade e UF.",
           email: (!/^\S+@\S+\.\S+$/.test(email) && "Informe um e-mail válido.") || (candidates.some((x) => x.email.toLowerCase() === email) && "Este e-mail já possui cadastro."),
@@ -837,13 +835,13 @@
         if (!ok) return;
         const id = "k" + Date.now().toString(36), name = v("name");
         candidates.push({
-          id, email, hash: await sha256(id + pass), name, initials: name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase(),
+          id, email, hash: await sha256(id + pass), cpfHash, name, initials: name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase(),
           role: v("role"), location: v("city"), phone: v("phone"), availability: "Disponível para novas oportunidades", about: "",
           interests: [v("area")], skills: [], experience: [], education: [],
         });
         saveCandidates(); setUser("candidate", id, true);
         toast("Conta criada! Complete seu perfil.");
-        location.hash = "#/perfil";
+        go(fromChat ? "#/whatsapp" : "#/perfil");
       });
     }
     if (name === "perfil") {
@@ -902,7 +900,7 @@
         store.set("conecta-custom-companies", customCompanies); store.set("conecta-custom-accounts", customAccounts);
         setUser("company", id, true);
         toast("Conta criada! Bem-vindo(a) à Conecta+.");
-        location.hash = "#/painel";
+        go("#/painel");
       });
     }
     if (name === "painel") {
@@ -946,7 +944,7 @@
         };
         jobs.push(j); customJobs.push(j); store.set("conecta-custom-jobs", customJobs);
         toast("Vaga publicada! Ela já aparece na lista de vagas.");
-        location.hash = "#/painel";
+        go("#/painel");
       });
     }
     if (name === "contato") {
@@ -1014,21 +1012,34 @@
 
   const jobsHtml = (list) => list.slice(0, 4).map((j) => `<a class="wa-job" href="#/vaga/${j.id}" data-chat-link><strong>${esc(j.title)}</strong><small>${esc(company(j.company).name)} · ${esc(j.location)}<br>${salary(j)} · ${j.modality}</small></a>`).join("");
 
-  const finish = async (cat) => {
-    const d = chat.data, first = d.name.split(" ")[0];
-    const found = jobs.filter((j) => j.category === cat);
-    if (found.length) {
-      await botSay(`Perfeito, ${esc(first)}! Encontrei <strong>${found.length}</strong> ${found.length === 1 ? "vaga disponível" : "vagas disponíveis"} em <strong>${esc(cat)}</strong>:${jobsHtml(found)}${found.length > 4 ? `<br>E mais ${found.length - 4} no site.` : ""}`, 1200);
-    } else {
-      await botSay(`${esc(first)}, no momento não há vagas abertas em <strong>${esc(cat)}</strong>, mas seu perfil ficará no nosso banco de talentos.`, 1000);
+  /* Resposta padrão para quem já tem cadastro: resumo do perfil + vagas abertas (sem refazer triagem) */
+  const defaultInfo = async (cand) => {
+    const first = cand.name.split(" ")[0];
+    const interests = cand.interests || [];
+    let list = jobs.filter((j) => interests.includes(j.category));
+    if (!list.length) list = jobs.filter((j) => j.featured);
+    await botSay(`Encontrei seu cadastro, <strong>${esc(first)}</strong>! Estas são as informações padrão da sua conta:<br><br><strong>${esc(cand.name)}</strong>${cand.role ? `<br>${esc(cand.role)}` : ""}${cand.location ? `<br>${esc(cand.location)}` : ""}<br>Interesses: ${esc(interests.join(", ") || "não informados")}`, 1100);
+    await botSay(`Vagas abertas para você:${jobsHtml(list)}${list.length > 4 ? `<br>E mais ${list.length - 4} no site.` : ""}`, 1100);
+    // vindo de uma vaga/empresa específica, registramos o interesse para a empresa
+    const x = chat.ctx;
+    if (x.jobId || x.companyId) {
+      const j = x.jobId && job(x.jobId);
+      saveLead({ id: "l" + Date.now().toString(36), name: cand.name, cpf: maskCpf(chat.data.cpf || cand.cpf || ""), area: j ? j.category : "Geral", jobId: j ? j.id : null, companyIds: [x.companyId], candidateId: cand.id, at: new Date().toISOString() });
+      await botSay("Também avisei a empresa do seu interesse. <strong>Ela responderá por aqui</strong> em até 2 dias úteis.", 900);
     }
-    const companyIds = new Set(found.map((j) => j.company));
-    if (chat.ctx.companyId) companyIds.add(chat.ctx.companyId);
-    saveLead({ id: "l" + Date.now().toString(36), name: d.name, cpf: d.cpf, area: cat, jobId: chat.ctx.jobId || (found[0] && found[0].id) || null, companyIds: [...companyIds], candidateId: (getCandidate() || {}).id || null, at: new Date().toISOString() });
-    await botSay("Seu cadastro foi registrado. <strong>A empresa entrará em contato com você por aqui</strong> em até 2 dias úteis. Obrigado por usar a Conecta+!", 1000);
     chat.step = "done";
     setInput(false, "Conversa finalizada");
-    setQuick([{ label: "Ver vagas no site", value: "__site" }, { label: "Nova triagem", value: "__restart" }]);
+    setQuick([{ label: "Ver vagas no site", value: "__site" }, { label: "Meu perfil", value: "__profile" }, { label: "Nova conversa", value: "__restart" }]);
+  };
+
+  /* CPF não encontrado: pede o cadastro na plataforma */
+  const askRegister = async () => {
+    const d = chat.data, q = new URLSearchParams({ from: "whatsapp", cpf: d.cpfRaw });
+    if (d.name) q.set("nome", d.name);
+    await botSay("Não encontrei esse CPF entre os cadastros da Conecta+. Para continuar, <strong>faça seu cadastro na plataforma</strong> — leva 1 minuto e seus dados já vêm preenchidos.", 1000);
+    await botSay(`<a class="wa-job" href="#/cadastro-candidato?${q.toString()}" data-chat-link><strong>Criar meu cadastro</strong><small>Depois do cadastro, volte aqui para ver suas informações.</small></a>`, 700);
+    chat.step = "cpf"; setInput(true, "Outro CPF (11 números)");
+    setQuick([{ label: "Criar cadastro", value: "__register" }, { label: "Tentar outro CPF", value: "__retry" }]);
   };
 
   const startChat = async () => {
@@ -1041,54 +1052,36 @@
       if (x.jobId) await botSay(`Vi que você tem interesse na vaga <strong>${esc(job(x.jobId).title)}</strong> da <strong>${esc(company(job(x.jobId).company).name)}</strong>.`, 800);
       else if (x.companyId) await botSay(`Você está falando com a triagem da <strong>${esc(company(x.companyId).name)}</strong>.`, 800);
       const me = getCandidate();
-      if (me) {
+      if (me && (me.cpfHash || me.cpf)) {
         chat.data.name = me.name;
-        await botSay(`Olá, <strong>${esc(me.name.split(" ")[0])}</strong>! Já temos seu nome do seu perfil. Vou fazer uma triagem rápida com 2 perguntas. Primeiro: informe seu <strong>CPF</strong> (somente números).`, 1000);
+        await botSay(`Olá, <strong>${esc(me.name.split(" ")[0])}</strong>! Você já está conectado, vou consultar seu cadastro.`, 800);
+        if (my !== chat.run) return;
+        await defaultInfo(me);
+      } else {
+        await botSay("Para começar, informe o seu <strong>CPF</strong> (somente números). Vou verificar se você já tem cadastro.", 900);
         if (my !== chat.run) return;
         chat.step = "cpf"; setInput(true, "CPF (11 números)");
-      } else {
-        await botSay("Vou fazer uma triagem rápida com 3 perguntas. Primeiro: <strong>qual é o seu nome completo?</strong>", 900);
-        if (my !== chat.run) return;
-        chat.step = "name"; setInput(true, "Seu nome completo");
       }
     } catch (e) { if (e !== "cancel") throw e; }
   };
 
   const onUser = async (text) => {
     text = text.trim();
-    if (!text || chat.busy || !chat.step || chat.step === "done") return;
-    const my = chat.run, step = chat.step;
+    if (!text || chat.busy || chat.step !== "cpf") return;
     try {
-      if (step === "name") {
-        addMsg(esc(text), "me");
-        if (text.length < 5 || !/\S+\s+\S+/.test(text)) { await botSay("Pode me informar nome e sobrenome, por favor?", 600); return; }
-        chat.data.name = text; chat.step = ""; setInput(false);
-        await botSay(`Prazer, ${esc(text.split(" ")[0])}! Agora informe o seu <strong>CPF</strong> (somente números).`, 800);
-        chat.step = "cpf"; setInput(true, "CPF (11 números)");
-      } else if (step === "cpf") {
-        if (!validCpf(text)) { addMsg(esc(text), "me"); await botSay("Esse CPF não parece válido. Digite os 11 números, por favor.", 700); return; }
-        chat.data.cpf = maskCpf(text);
-        addMsg(esc(chat.data.cpf), "me"); chat.step = ""; setInput(false);
-        await botSay("Recebido. Por segurança, guardamos apenas parte do número. Por último: <strong>qual é a sua área de interesse?</strong>", 900);
-        const cats = [...categories];
-        const pref = chat.ctx.jobId && job(chat.ctx.jobId).category;
-        if (pref) cats.sort((a, b) => (b === pref) - (a === pref));
-        setQuick(cats.map((c) => ({ label: c, value: c })));
-        chat.step = "area"; setInput(true, "Escolha ou digite a área");
-      } else if (step === "area") {
-        addMsg(esc(text), "me");
-        const t = norm(text);
-        const cat = categories.find((c) => norm(c) === t) || categories.find((c) => norm(c).includes(t) || t.includes(norm(c)));
-        if (!cat) { await botSay("Não encontrei essa área. Toque em uma das opções abaixo.", 600); return; }
-        chat.step = ""; setInput(false); setQuick([]);
-        await finish(cat);
-      }
+      if (!validCpf(text)) { addMsg(esc(text), "me"); await botSay("Esse CPF não parece válido. Digite os 11 números, por favor.", 700); return; }
+      chat.data.cpfRaw = text.replace(/\D/g, ""); chat.data.cpf = maskCpf(text);
+      addMsg(esc(chat.data.cpf), "me"); chat.step = ""; setInput(false); setQuick([]);
+      await botSay("Recebido. Consultando a base de cadastros…", 900);
+      const found = await findByCpf(text);
+      if (found) { chat.data.name = found.name; await defaultInfo(found); }
+      else await askRegister();
     } catch (e) { if (e !== "cancel") throw e; }
   };
 
   const openWa = (kind) => {
     const [type, id] = kind.split(":");
-    location.hash = "#/whatsapp" + (type === "job" ? `?vaga=${id}` : type === "company" ? `?empresa=${id}` : "");
+    go("#/whatsapp" + (type === "job" ? `?vaga=${id}` : type === "company" ? `?empresa=${id}` : ""));
   };
 
   const bindChat = () => {
@@ -1098,8 +1091,10 @@
       if (!q) return;
       const v = q.dataset.q;
       if (v === "__restart") return startChat();
-      if (v === "__site") { location.hash = "#/vagas"; return; }
-      if (chat.step === "area" && !chat.busy) { setQuick([]); onUser(v); }
+      if (v === "__site") { go("#/vagas"); return; }
+      if (v === "__profile") { go("#/perfil"); return; }
+      if (v === "__register") { go("#/cadastro-candidato?from=whatsapp&cpf=" + (chat.data.cpfRaw || "")); return; }
+      if (v === "__retry") { setQuick([]); chat.data = {}; textEl.focus(); }
     });
     $("#waRestart").addEventListener("click", startChat);
     $("#waForm").addEventListener("submit", (e) => {
@@ -1133,7 +1128,7 @@
     if (logged) links.push(["contato", "#/contato", "Contato"]); else links.push(["login", "#/entrar", "Entrar"]);
     nav.innerHTML = links.map(([k, href, label]) => `<a href="${href}" ${k === key ? 'aria-current="page"' : ""}>${label}</a>`).join("")
       + (logged ? `<button type="button" class="nav-out" data-logout>Sair</button>` : "")
-      + `<button class="btn btn-wa nav-cta" data-wa="recruiter" type="button">${icons.wa}Falar com recrutador</button>`;
+;
     $$("[data-auth]").forEach((el) => { el.hidden = !(el.dataset.auth === "candidate" ? cand : logged); });
   }
   function closeMenu() { nav.classList.remove("open"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Abrir menu"); }
@@ -1149,7 +1144,7 @@
     const out = e.target.closest("[data-logout]");
     if (out) {
       clearUser(); toast("Você saiu da sua conta.");
-      parseHash().name === "home" ? render() : (location.hash = "#/");
+      setTimeout(() => go("#/"), 700);
       return;
     }
     const fav = e.target.closest("[data-fav]");
@@ -1157,7 +1152,7 @@
       e.stopPropagation();
       if (!getCandidate()) {
         if (getSession()) return toast("Apenas candidatos podem salvar vagas.");
-        nextRoute = location.hash; toast("Entre como candidato para salvar vagas."); location.hash = "#/entrar"; return;
+        nextRoute.set(Route.current()); toast("Entre como candidato para salvar vagas."); setTimeout(() => go("#/entrar"), 900); return;
       }
       const id = fav.dataset.fav;
       favs.has(id) ? favs.delete(id) : favs.add(id); saveFavs();
@@ -1171,15 +1166,14 @@
     const t = e.target.closest("[data-toast]");
     if (t) return toast(t.dataset.toast);
     if (e.target.closest("a, button, input, select, label")) {
-      const g = e.target.closest("[data-go]:is(button)"); if (g) location.hash = g.dataset.go;
+      const g = e.target.closest("[data-go]:is(button)"); if (g) go(g.dataset.go);
       return;
     }
     const card = e.target.closest("[data-go]");
-    if (card) location.hash = card.dataset.go;
+    if (card) go(card.dataset.go);
   });
 
   /* ---------- Init ---------- */
   $("#footContact").innerHTML = `${platform.whatsappLabel}<br>${platform.email}<br>${platform.hours}`;
-  window.addEventListener("hashchange", render);
   render();
 })();

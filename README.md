@@ -6,45 +6,49 @@ Não usa backend, banco de dados, APIs ou serviços externos: tudo roda no naveg
 ## Como executar
 
 1. Abra o arquivo `Index.html` no navegador (duplo clique). Não precisa de servidor.
-2. Navegue pelo menu. As páginas são trocadas por *hash* (`#/vagas`, `#/whatsapp`…), então funciona direto em `file://`.
+2. Navegue pelo menu. Cada página é um arquivo HTML real (`pages/*.html`), então funciona direto em `file://`.
 
 ## Estrutura do projeto
 
 ```
-Index.html        Esqueleto: cabeçalho, rodapé, logo (SVG embutido) e container das páginas
-css/style.css     Estilos (tokens de cor, componentes, responsivo mobile-first)
-js/data.js        Dados fictícios centralizados (vagas, empresas, contas, perfil, contatos)
-js/app.js         Roteador, páginas, componentes, chatbot e área da empresa
+Index.html            Página inicial (home)
+pages/                Uma página por arquivo: vagas, vaga, empresas, perfil, contato, whatsapp,
+                      entrar, cadastro-candidato, cadastro-empresa, painel, nova-vaga
+js/layout.js          Header, rodapé, logo (SVG) e rotas entre páginas — único lugar a editar para mudar o layout
+js/data.js            Dados fictícios centralizados (vagas, empresas, contas, perfil, contatos)
+js/app.js             Conteúdo de cada página, componentes, chatbot e área da empresa
+css/style.css         Estilos (tokens de cor, componentes, responsivo mobile-first)
 assets/logo.svg       Logo completo em SVG
 assets/logo-icon.svg  Ícone (favicon)
 ```
 
-## Páginas e rotas
+Cada arquivo de `pages/` é só um esqueleto com `<main id="main" data-page="nome">` + os 3 scripts; o `data-page` diz ao `app.js` qual conteúdo montar. Para **criar uma página nova**: copie um arquivo de `pages/`, troque o `data-page`/título e adicione a função de mesmo nome em `pages` no `app.js` (e o nome em `PAGES` no `layout.js`).
 
-| Rota | Página | Acesso |
+## Páginas
+
+| Arquivo | Página | Acesso |
 |---|---|---|
-| `#/` | Início: busca, filtros, vagas em destaque, empresas | público |
-| `#/vagas` | Lista de vagas com filtros laterais, busca e ordenação | público |
-| `#/vaga/ID` | Detalhes da vaga + botão "Tenho interesse" | público |
-| `#/empresas` | Empresas cadastradas (inclui as novas) | público |
-| `#/perfil` | **Meu perfil** do candidato (editável) | candidato logado |
-| `#/contato` | Informações, formulário e WhatsApp | qualquer usuário logado |
-| `#/whatsapp` | **Triagem pelo WhatsApp** (chatbot simulado) | público |
-| `#/entrar` | **Login** de candidato ou empresa | visitante |
-| `#/cadastro-candidato` | **Cadastro de candidato** | visitante |
-| `#/cadastro-empresa` | **Cadastro de empresa** | visitante |
-| `#/painel` | Painel: vagas da empresa e candidatos interessados | logado |
-| `#/nova-vaga` | **Cadastro de vaga** (formulário completo) | logado |
+| `Index.html` | Início: busca, filtros, vagas em destaque, empresas | público |
+| `pages/vagas.html` | Lista de vagas com filtros, busca e ordenação (`?cat=`, `?empresa=`, `?modality=`) | público |
+| `pages/vaga.html?id=ID` | Detalhes da vaga + botão "Tenho interesse" | público |
+| `pages/empresas.html` | Empresas cadastradas (inclui as novas) | público |
+| `pages/perfil.html` | **Meu perfil** do candidato (editável) | candidato logado |
+| `pages/contato.html` | Informações, formulário e WhatsApp | qualquer usuário logado |
+| `pages/whatsapp.html` | **Atendimento pelo WhatsApp** (chatbot simulado) | público |
+| `pages/entrar.html` | **Login** de candidato ou empresa | visitante |
+| `pages/cadastro-candidato.html` | **Cadastro de candidato** (com CPF) | visitante |
+| `pages/cadastro-empresa.html` | **Cadastro de empresa** | visitante |
+| `pages/painel.html` | Painel: vagas da empresa e candidatos interessados | logado |
+| `pages/nova-vaga.html` | **Cadastro de vaga** (formulário completo) | logado |
 
-`#/whatsapp` aceita contexto: `?vaga=ID` (candidatura a uma vaga) ou `?empresa=ID` (contato com a empresa).
-Rotas protegidas redirecionam para `#/entrar` e, depois do login, voltam para a página pedida. Os links **Meu perfil** e **Contato** (menu e rodapé) só aparecem após o login. Quem já está logado e abre `#/entrar` é levado ao próprio perfil ou painel.
+`whatsapp.html` aceita contexto: `?vaga=ID` ou `?empresa=ID`. Páginas protegidas redirecionam para `entrar.html` e, depois do login, voltam para a página pedida (a rota fica no `sessionStorage`). Links internos são escritos como `#/rota` nos templates e convertidos para links reais pelo `layout.js`.
 
 ## Login (somente com o armazenamento do navegador)
 
 Não há servidor: contas e sessão ficam no `localStorage`/`sessionStorage` do navegador.
 
 - **Tipos de conta:** candidato e empresa, escolhidos no seletor da tela de login.
-- **Cadastro:** valida os campos (e-mail único por tipo, senha com 8+ caracteres, letras e números, confirmação, termos). A senha é guardada como hash SHA-256 com sal.
+- **Cadastro:** valida os campos (CPF válido e único, e-mail único por tipo, senha com 8+ caracteres, letras e números, confirmação, termos). A senha é guardada como hash SHA-256 com sal.
 - **Sessão:** "Manter conectado neste navegador" grava no `localStorage` (continua após fechar o navegador); desmarcado, grava no `sessionStorage` (acaba ao fechar a aba). "Sair" apaga a sessão.
 - **Proteção simples:** bloqueio de 30 s após 5 tentativas erradas.
 - **Contas de demonstração** (senha `demo123`): candidato `mariana.souza@exemplo.com`; empresas na tabela abaixo.
@@ -53,16 +57,17 @@ Não há servidor: contas e sessão ficam no `localStorage`/`sessionStorage` do 
 
 Mostra dados, áreas, habilidades, vagas salvas (o coração só funciona logado como candidato, e cada candidato tem a sua lista), triagens feitas no WhatsApp, experiência e formação. Dá para editar o perfil e adicionar/remover experiências e formações. Com o candidato logado, o chatbot já usa o nome do perfil e pergunta só o CPF.
 
-## Chatbot de triagem (WhatsApp simulado)
+## Chatbot do WhatsApp (verificação por CPF)
 
 Página própria, com visual de conversa do WhatsApp. Fluxo:
 
-1. **Nome completo** — exige nome e sobrenome.
-2. **CPF** — máscara automática e validação dos dígitos verificadores. CPF de teste: `529.982.247-25`. Apenas parte do número é guardada (`***.982.247-**`).
-3. **Área de interesse** — respostas rápidas com as categorias (ou texto livre).
-4. **Resultado** — lista as vagas abertas na área escolhida (com link para cada uma) e informa que a empresa entrará em contato em até 2 dias úteis. Sem vagas na área, o candidato entra no "banco de talentos".
+1. **CPF** — máscara automática e validação dos dígitos verificadores.
+2. **CPF já cadastrado** — o bot só devolve a **informação padrão**: nome, cargo, cidade e interesses da conta, mais as vagas abertas nas áreas de interesse (ou as de destaque). Se a conversa veio de uma vaga/empresa, o interesse é registrado como *lead* para a empresa.
+3. **CPF não cadastrado** — o bot pede o **cadastro na plataforma** com um link para `cadastro-candidato.html` (CPF e nome já preenchidos). Ao concluir o cadastro, o usuário volta ao chat, que reconhece a conta e mostra a informação padrão.
 
-Ao final, a triagem é salva como *lead* e aparece no painel da(s) empresa(s) com vaga naquela área. Nada é enviado de verdade.
+CPFs de teste: `529.982.247-25` (cadastrado — conta demo) e `111.444.777-35` (válido, sem cadastro). Candidato já logado pula a pergunta do CPF.
+
+O cadastro guarda apenas o **hash SHA-256** do CPF (a conta demo traz o CPF em texto nos dados de exemplo). Nada é enviado de verdade.
 
 ## Área da empresa
 
@@ -97,6 +102,7 @@ O que o navegador guarda (`localStorage`, exceto a sessão):
 | `conecta-leads` | triagens feitas no chatbot |
 | `conecta-favs-<id>` | vagas salvas por cada candidato |
 | `conecta-session` | usuário logado (`localStorage` ou `sessionStorage`) |
+| `conecta-next` | rota pedida antes do login (`sessionStorage`) |
 
 Para zerar o protótipo, limpe os dados do site no navegador.
 
