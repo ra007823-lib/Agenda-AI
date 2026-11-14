@@ -1,6 +1,6 @@
 /* =========================================================
    Conecta+ — Layout compartilhado e rotas entre páginas
-   Cada página (Index.html e pages/*.html) tem só um <main id="main"
+   Cada página (index.html e pages/*.html) tem só um <main id="main"
    data-page="..."> e carrega este arquivo + data.js + app.js.
    Header, rodapé e logo ficam AQUI (um único lugar para manter).
    ========================================================= */
@@ -9,12 +9,12 @@
   const ROOT = document.currentScript.src.replace(/js\/layout\.js.*$/, "");
   const PAGES = ["vagas", "vaga", "empresas", "perfil", "contato", "whatsapp", "entrar", "cadastro-candidato", "cadastro-empresa", "painel", "nova-vaga"];
 
-  /* "#/vaga/j1?x=1" -> ".../pages/vaga.html?id=j1&x=1" ; "#/" -> ".../Index.html" */
+  /* "#/vaga/j1?x=1" -> ".../pages/vaga.html?id=j1&x=1" ; "#/" -> ".../index.html" */
   const url = (r) => {
     if (typeof r !== "string" || !r.startsWith("#/")) return r;
     const [path, qs = ""] = r.slice(2).split("?");
     const [name, arg] = path.split("/");
-    if (!name) return ROOT + "Index.html" + (qs ? "?" + qs : "");
+    if (!name) return ROOT + "index.html" + (qs ? "?" + qs : "");
     const q = [arg ? "id=" + arg : "", qs].filter(Boolean).join("&");
     return ROOT + "pages/" + (PAGES.includes(name) ? name : "vagas") + ".html" + (q ? "?" + q : "");
   };

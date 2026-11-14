@@ -5,13 +5,13 @@ Não usa backend, banco de dados, APIs ou serviços externos: tudo roda no naveg
 
 ## Como executar
 
-1. Abra o arquivo `Index.html` no navegador (duplo clique). Não precisa de servidor.
+1. Abra o arquivo `index.html` no navegador (duplo clique). Não precisa de servidor.
 2. Navegue pelo menu. Cada página é um arquivo HTML real (`pages/*.html`), então funciona direto em `file://`.
 
 ## Estrutura do projeto
 
 ```
-Index.html            Página inicial (home)
+index.html            Página inicial (home)
 pages/                Uma página por arquivo: vagas, vaga, empresas, perfil, contato, whatsapp,
                       entrar, cadastro-candidato, cadastro-empresa, painel, nova-vaga
 js/layout.js          Header, rodapé, logo (SVG) e rotas entre páginas — único lugar a editar para mudar o layout
@@ -28,7 +28,7 @@ Cada arquivo de `pages/` é só um esqueleto com `<main id="main" data-page="nom
 
 | Arquivo | Página | Acesso |
 |---|---|---|
-| `Index.html` | Início: busca, filtros, vagas em destaque, empresas | público |
+| `index.html` | Início: busca, filtros, vagas em destaque, empresas | público |
 | `pages/vagas.html` | Lista de vagas com filtros, busca e ordenação (`?cat=`, `?empresa=`, `?modality=`) | público |
 | `pages/vaga.html?id=ID` | Detalhes da vaga + botão "Tenho interesse" | público |
 | `pages/empresas.html` | Empresas cadastradas (inclui as novas) | público |
